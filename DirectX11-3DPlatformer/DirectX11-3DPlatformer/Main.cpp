@@ -19,8 +19,16 @@ ID3D11Device*			d3d11Device;
 ID3D11DeviceContext*	d3d11DevCon;
 ID3D11RenderTargetView* renderTargetView;
 
+ID3D11Buffer* triangleVertBuffer;	//Buffer that will hold vertex data
+ID3D11VertexShader* vertexShader;
+ID3D11PixelShader* pixelShader;
+ID3D10Blob* VS_Buffer;				//Information about the vertex shader
+ID3D10Blob* PS_Buffer;				//Information about the pixel shader
+ID3D11InputLayout* vertexLayout; 
+
 LPCTSTR WndClassName = L"firstwindow";	//Window Name
 HWND hwnd = NULL;						//Window Handle
+HRESULT hResult;						//Used for error checking
 
 const int WINDOW_WIDTH = 800;
 const int WINDOW_HEIGHT = 600;
@@ -45,6 +53,23 @@ LRESULT CALLBACK WndProc(HWND hWnd,
 	UINT msg,
 	WPARAM wParam,
 	LPARAM lParam);
+
+struct Vertex
+{
+	D3DXVECTOR3 position;
+	D3DXCOLOR	color;
+
+	Vertex() {}
+	Vertex(D3DXVECTOR3 _position, D3DXCOLOR _colour) : position(_position), color(_colour) {}
+};
+
+//The input-layout description
+D3D11_INPUT_ELEMENT_DESC inputElementDesc[] =
+{
+	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+	{"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0}
+};
+UINT numElements = ARRAYSIZE(inputElementDesc);
 
 //Main windows function - application start
 int WINAPI WinMain(HINSTANCE hInstance,
@@ -139,9 +164,6 @@ bool InitializeWindow(HINSTANCE hInstance,
 
 bool InitializeDirect3d11(HINSTANCE hInstance)
 {
-	//Used for error checking
-	HRESULT hResult;
-
 	//Buffer Description - struct
 	DXGI_MODE_DESC bufferDesc;
 	
@@ -218,19 +240,6 @@ bool InitializeDirect3d11(HINSTANCE hInstance)
 	//Set render target
 	d3d11DevCon->OMSetRenderTargets(1, &renderTargetView, NULL);
 
-	/*
-	// Set the viewport
-	D3D11_VIEWPORT viewport;
-	ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
-
-	viewport.TopLeftX = 0;
-	viewport.TopLeftY = 0;
-	viewport.Width = WINDOW_WIDTH;
-	viewport.Height = WINDOW_HEIGHT;
-
-	d3d11DevCon->RSSetViewports(1, &viewport);
-	*/
-
 	return true;
 }
 
@@ -240,11 +249,79 @@ void ReleaseObjects()
 	swapChain->Release();
 	d3d11Device->Release();
 	d3d11DevCon->Release();
+	renderTargetView->Release();
+	triangleVertBuffer->Release();
+	vertexShader->Release();
+	pixelShader->Release();
+	VS_Buffer->Release();
+	PS_Buffer->Release();
+	vertexLayout->Release();
 }
 
 //Initialize the game scene
 bool InitScene()
 {
+	//Compile Shaders from the shader file
+	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "VShader", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "PShader", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
+
+	//Create the Shader Objects
+	hResult = d3d11Device->CreateVertexShader(VS_Buffer->GetBufferPointer(), VS_Buffer->GetBufferSize(), NULL, &vertexShader);
+	hResult = d3d11Device->CreatePixelShader(PS_Buffer->GetBufferPointer(), PS_Buffer->GetBufferSize(), NULL, &pixelShader);
+
+	//Set Vertex and Pixel Shaders
+	d3d11DevCon->VSSetShader(vertexShader, 0, 0);
+	d3d11DevCon->PSSetShader(pixelShader, 0, 0);
+
+	//Create the vertex buffer
+	Vertex vertexBufferArray[] =
+	{
+		Vertex{D3DXVECTOR3(0.0f, 0.5f, 0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
+		Vertex{D3DXVECTOR3(0.45f, -0.5, 0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
+		Vertex{D3DXVECTOR3(-0.45f, -0.5f, 0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)}
+	};
+
+	D3D11_BUFFER_DESC vertexBufferDesc;
+	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
+
+	vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU / Read only GPU
+	vertexBufferDesc.ByteWidth = sizeof(Vertex) * 3;			//Bite Size = Vertex struct * 3
+	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;		//Use buffer as a vertex buffer
+	vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write to the buffer
+
+	D3D11_SUBRESOURCE_DATA vertexBufferData;
+	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));
+	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &triangleVertBuffer);
+	
+	/*
+	//Create the Input Layout
+	d3d11Device->CreateInputLayout(inputElementDesc, numElements, VS_Buffer->GetBufferPointer(),
+		VS_Buffer->GetBufferSize(), &vertexLayout);
+
+	//Set the Input Layout
+	d3d11DevCon->IASetInputLayout(vertexLayout);
+
+	//Select which vertex buffer to display
+	UINT stride = sizeof(Vertex);
+	UINT offset = 0;
+	d3d11DevCon->IASetVertexBuffers(0, 1, &triangleVertBuffer, &stride, &offset);
+
+	//Select which primtive type we are using
+	d3d11DevCon->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+	*/
+
+	//Set the viewport
+	D3D11_VIEWPORT viewport;
+	ZeroMemory(&viewport, sizeof(D3D11_VIEWPORT));
+
+	viewport.TopLeftX = 0;
+	viewport.TopLeftY = 0;
+	viewport.Width = WINDOW_WIDTH;
+	viewport.Height = WINDOW_HEIGHT;
+
+	d3d11DevCon->RSSetViewports(1, &viewport);
+
 	return true;
 }
 
