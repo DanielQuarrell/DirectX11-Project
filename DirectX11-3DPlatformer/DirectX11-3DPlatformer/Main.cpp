@@ -262,8 +262,8 @@ void ReleaseObjects()
 bool InitScene()
 {
 	//Compile Shaders from the shader file
-	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "VShader", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
-	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "PShader", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "VS", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "PS", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
 
 	//Create the Shader Objects
 	hResult = d3d11Device->CreateVertexShader(VS_Buffer->GetBufferPointer(), VS_Buffer->GetBufferSize(), NULL, &vertexShader);
@@ -284,18 +284,21 @@ bool InitScene()
 	D3D11_BUFFER_DESC vertexBufferDesc;
 	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
 
-	vertexBufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//Write access by CPU / Read only GPU
-	vertexBufferDesc.ByteWidth = sizeof(Vertex) * 3;			//Bite Size = Vertex struct * 3
-	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;		//Use buffer as a vertex buffer
-	vertexBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//Allow CPU to write to the buffer
+	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU 
+	vertexBufferDesc.ByteWidth = sizeof(Vertex) * 3;							//Bite Size = Vertex struct * 3 since there is 3 elements in the array
+	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;						//Use buffer as a vertex buffer
+	vertexBufferDesc.CPUAccessFlags = 0;										//Defines if CPU access
+	vertexBufferDesc.MiscFlags = 0;												
+
 
 	D3D11_SUBRESOURCE_DATA vertexBufferData;
-	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));
-	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &triangleVertBuffer);
+
+	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));										//Clear the memory in the vertex buffer
+	vertexBufferData.pSysMem = vertexBufferArray;													//The data to place into the buffer				
+	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &triangleVertBuffer);	//Create the buffer
 	
-	/*
 	//Create the Input Layout
-	d3d11Device->CreateInputLayout(inputElementDesc, numElements, VS_Buffer->GetBufferPointer(),
+	hResult = d3d11Device->CreateInputLayout(inputElementDesc, numElements, VS_Buffer->GetBufferPointer(),
 		VS_Buffer->GetBufferSize(), &vertexLayout);
 
 	//Set the Input Layout
@@ -308,8 +311,6 @@ bool InitScene()
 
 	//Select which primtive type we are using
 	d3d11DevCon->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-
-	*/
 
 	//Set the viewport
 	D3D11_VIEWPORT viewport;
@@ -337,6 +338,9 @@ void RenderScene()
 	D3DXCOLOR backgroundColour(0.0f, 0.2f, 0.4f, 1.0f);
 
 	d3d11DevCon->ClearRenderTargetView(renderTargetView, backgroundColour);
+
+	//Number of vertices that need to be drawn, offset from the begining of the vertices array
+	d3d11DevCon->Draw(3, 0); 
 
 	//Present the back buffer to the screen
 	swapChain->Present(0, 0);
