@@ -10,22 +10,25 @@
 #pragma comment(lib, "d3dx11.lib")
 #pragma comment(lib, "d3dx10.lib")
 #pragma comment(lib, "DXErr.lib")
-#pragma comment(lib, "legacy_stdio_definitions.lib")
+#pragma comment(lib, "legacy_stdio_definitions.lib") //For error checking only
 
 //Global Variables
 
 IDXGISwapChain*			swapChain;
 ID3D11Device*			d3d11Device;
 ID3D11DeviceContext*	d3d11DevCon;
-ID3D11RenderTargetView* renderTargetView;
 
-ID3D11Buffer* squareIndexBuffer; //Buffer index to define triangles
-ID3D11Buffer* squareVertBuffer;	//Buffer that will hold vertex data
-ID3D11VertexShader* vertexShader;
-ID3D11PixelShader* pixelShader;
-ID3D10Blob* VS_Buffer;				//Information about the vertex shader
-ID3D10Blob* PS_Buffer;				//Information about the pixel shader
-ID3D11InputLayout* vertexLayout; 
+ID3D11RenderTargetView* renderTargetView;
+ID3D11Buffer*			squareIndexBuffer;	//Buffer index to define triangles
+ID3D11Buffer*			squareVertBuffer;	//Buffer that will hold vertex data
+ID3D11DepthStencilView* depthStencilView;
+ID3D11Texture2D*		depthStencilBuffer;
+
+ID3D11VertexShader*		vertexShader;
+ID3D11PixelShader*		pixelShader;
+ID3D10Blob*				VS_Buffer;			//Information about the vertex shader
+ID3D10Blob*				PS_Buffer;			//Information about the pixel shader
+ID3D11InputLayout*		vertexLayout; 
 
 LPCTSTR WndClassName = L"firstwindow";	//Window Name
 HWND hwnd = NULL;						//Window Handle
@@ -61,7 +64,8 @@ struct Vertex
 	D3DXCOLOR	color;
 
 	Vertex() {}
-	Vertex(D3DXVECTOR3 _position, D3DXCOLOR _colour) : position(_position), color(_colour) {}
+	Vertex(D3DXVECTOR3 _position, D3DXCOLOR _colour) 
+		: position(_position), color(_colour) {}
 };
 
 //The input-layout description
@@ -185,7 +189,7 @@ bool InitializeDirect3d11(HINSTANCE hInstance)
 	ZeroMemory(&swapChainDesc, sizeof(DXGI_SWAP_CHAIN_DESC)); //Cleared the data structure and set it to null
 
 	swapChainDesc.BufferDesc = bufferDesc;							//Buffer Description
-	swapChainDesc.SampleDesc.Count = 4;								//Number of multisamples
+	swapChainDesc.SampleDesc.Count = 1;								//Number of multisamples
 	swapChainDesc.SampleDesc.Quality = 0;							//The image quality level. The higher the quality, the lower the performance. The valid range is between zero and one less than the level returned by ID3D11Device::CheckMultisampleQualityLevels
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;	//How the swap chain is going to be used
 	swapChainDesc.BufferCount = 1;									//Number of back buffers in the chain
@@ -238,8 +242,34 @@ bool InitializeDirect3d11(HINSTANCE hInstance)
 		return 0;
 	}
 
+	//Describe the Depth/Stencil Buffer
+	D3D11_TEXTURE2D_DESC depthStecilDesc;
+
+	depthStecilDesc.Width		= WINDOW_WIDTH;
+	depthStecilDesc.Height		= WINDOW_HEIGHT;
+	depthStecilDesc.MipLevels	= 1;
+	depthStecilDesc.ArraySize	= 1;
+	depthStecilDesc.Format		= DXGI_FORMAT_D24_UNORM_S8_UINT;
+	depthStecilDesc.SampleDesc.Count	= 1;
+	depthStecilDesc.SampleDesc.Quality	= 0;
+	depthStecilDesc.Usage		= D3D11_USAGE_DEFAULT;
+	depthStecilDesc.BindFlags	= D3D11_BIND_DEPTH_STENCIL;
+	depthStecilDesc.CPUAccessFlags = 0;
+	depthStecilDesc.MiscFlags	= 0;
+
+	//Create the Depth/Stencil view
+	d3d11Device->CreateTexture2D(&depthStecilDesc, NULL, &depthStencilBuffer);
+	hResult = d3d11Device->CreateDepthStencilView(depthStencilBuffer, NULL, &depthStencilView);
+
+	if (FAILED(hResult))
+	{
+		MessageBox(NULL, DXGetErrorDescription(hResult),
+			TEXT("d3d11Device->CreateDepthStencilView"), MB_OK);
+		return 0;
+	}
+
 	//Set render target
-	d3d11DevCon->OMSetRenderTargets(1, &renderTargetView, NULL);
+	d3d11DevCon->OMSetRenderTargets(1, &renderTargetView, depthStencilView);
 
 	return true;
 }
@@ -258,6 +288,8 @@ void ReleaseObjects()
 	VS_Buffer->Release();
 	PS_Buffer->Release();
 	vertexLayout->Release();
+	depthStencilView->Release();
+	depthStencilBuffer->Release();
 }
 
 //Initialize the game scene
@@ -293,7 +325,7 @@ bool InitScene()
 	ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
 
 	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU
-	indexBufferDesc.ByteWidth = sizeof(DWORD) * sizeof(indices);				//Byte size = DWORD type * 2 triangles * 3 verticies for each triangle
+	indexBufferDesc.ByteWidth = sizeof(DWORD) * 2 * 3;				//Byte size = DWORD type * 2 triangles * 3 verticies for each triangle
 	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;						//Use buffer as a index buffer
 	indexBufferDesc.CPUAccessFlags = 0;											//Defines how a CPU can access a resource
 	indexBufferDesc.MiscFlags = 0;
@@ -309,7 +341,7 @@ bool InitScene()
 	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
 
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU 
-	vertexBufferDesc.ByteWidth = sizeof(Vertex) * sizeof(vertexBufferArray);	//Byte Size = Vertex struct * 3 since there is 3 elements in the array
+	vertexBufferDesc.ByteWidth = sizeof(Vertex) * 6;	//Byte Size = Vertex struct * 3 since there is 3 elements in the array
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;						//Use buffer as a vertex buffer
 	vertexBufferDesc.CPUAccessFlags = 0;										//Defines how a CPU can access a resource
 	vertexBufferDesc.MiscFlags = 0;												
@@ -343,6 +375,8 @@ bool InitScene()
 	viewport.TopLeftY = 0;
 	viewport.Width = WINDOW_WIDTH;
 	viewport.Height = WINDOW_HEIGHT;
+	viewport.MinDepth = 0.0f;
+	viewport.MaxDepth = 1.0f;
 
 	d3d11DevCon->RSSetViewports(1, &viewport);
 
@@ -359,8 +393,9 @@ void RenderScene()
 {
 	//Clear our backbuffer to the updated color
 	D3DXCOLOR backgroundColour(0.0f, 0.2f, 0.4f, 1.0f);
-
 	d3d11DevCon->ClearRenderTargetView(renderTargetView, backgroundColour);
+	//Refresh the Depth/StencilView
+	d3d11DevCon->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
 	//Number of indices that need to be drawn, offset from the begining of the index array, offset from the begining of the vertices array
 	d3d11DevCon->DrawIndexed(6, 0, 0); 
