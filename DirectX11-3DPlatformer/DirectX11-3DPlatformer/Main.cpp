@@ -19,7 +19,8 @@ ID3D11Device*			d3d11Device;
 ID3D11DeviceContext*	d3d11DevCon;
 ID3D11RenderTargetView* renderTargetView;
 
-ID3D11Buffer* triangleVertBuffer;	//Buffer that will hold vertex data
+ID3D11Buffer* squareIndexBuffer; //Buffer index to define triangles
+ID3D11Buffer* squareVertBuffer;	//Buffer that will hold vertex data
 ID3D11VertexShader* vertexShader;
 ID3D11PixelShader* pixelShader;
 ID3D10Blob* VS_Buffer;				//Information about the vertex shader
@@ -250,7 +251,8 @@ void ReleaseObjects()
 	d3d11Device->Release();
 	d3d11DevCon->Release();
 	renderTargetView->Release();
-	triangleVertBuffer->Release();
+	squareVertBuffer->Release();
+	squareIndexBuffer->Release();
 	vertexShader->Release();
 	pixelShader->Release();
 	VS_Buffer->Release();
@@ -276,26 +278,47 @@ bool InitScene()
 	//Create the vertex buffer
 	Vertex vertexBufferArray[] =
 	{
-		Vertex{D3DXVECTOR3(0.0f, 0.5f, 0.0f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3(0.45f, -0.5, 0.0f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3(-0.45f, -0.5f, 0.0f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)}
+		Vertex{D3DXVECTOR3(-0.5f, -0.5f, 0.5f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
+		Vertex{D3DXVECTOR3(-0.5f,  0.5f, 0.5f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
+		Vertex{D3DXVECTOR3( 0.5f,  0.5f, 0.5f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)},
+		Vertex{D3DXVECTOR3( 0.5f, -0.5f, 0.5f), D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f)}
 	};
+
+	DWORD indices[] = {
+		0, 1, 2,
+		0, 2, 3
+	};
+
+	D3D11_BUFFER_DESC indexBufferDesc;
+	ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
+
+	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU
+	indexBufferDesc.ByteWidth = sizeof(DWORD) * sizeof(indices);				//Byte size = DWORD type * 2 triangles * 3 verticies for each triangle
+	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;						//Use buffer as a index buffer
+	indexBufferDesc.CPUAccessFlags = 0;											//Defines how a CPU can access a resource
+	indexBufferDesc.MiscFlags = 0;
+
+	D3D11_SUBRESOURCE_DATA iinitData;
+
+	iinitData.pSysMem = indices;
+	d3d11Device->CreateBuffer(&indexBufferDesc, &iinitData, &squareIndexBuffer);	//Create the buffer
+
+	d3d11DevCon->IASetIndexBuffer(squareIndexBuffer, DXGI_FORMAT_R32_UINT, 0);		//Bind it to the IA stage of the graphics pipeline
 
 	D3D11_BUFFER_DESC vertexBufferDesc;
 	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
 
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU 
-	vertexBufferDesc.ByteWidth = sizeof(Vertex) * 3;							//Bite Size = Vertex struct * 3 since there is 3 elements in the array
+	vertexBufferDesc.ByteWidth = sizeof(Vertex) * sizeof(vertexBufferArray);	//Byte Size = Vertex struct * 3 since there is 3 elements in the array
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;						//Use buffer as a vertex buffer
-	vertexBufferDesc.CPUAccessFlags = 0;										//Defines if CPU access
+	vertexBufferDesc.CPUAccessFlags = 0;										//Defines how a CPU can access a resource
 	vertexBufferDesc.MiscFlags = 0;												
-
 
 	D3D11_SUBRESOURCE_DATA vertexBufferData;
 
 	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));										//Clear the memory in the vertex buffer
 	vertexBufferData.pSysMem = vertexBufferArray;													//The data to place into the buffer				
-	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &triangleVertBuffer);	//Create the buffer
+	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &squareVertBuffer);	//Create the buffer
 	
 	//Create the Input Layout
 	hResult = d3d11Device->CreateInputLayout(inputElementDesc, numElements, VS_Buffer->GetBufferPointer(),
@@ -307,7 +330,7 @@ bool InitScene()
 	//Select which vertex buffer to display
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
-	d3d11DevCon->IASetVertexBuffers(0, 1, &triangleVertBuffer, &stride, &offset);
+	d3d11DevCon->IASetVertexBuffers(0, 1, &squareVertBuffer, &stride, &offset);
 
 	//Select which primtive type we are using
 	d3d11DevCon->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -339,8 +362,8 @@ void RenderScene()
 
 	d3d11DevCon->ClearRenderTargetView(renderTargetView, backgroundColour);
 
-	//Number of vertices that need to be drawn, offset from the begining of the vertices array
-	d3d11DevCon->Draw(3, 0); 
+	//Number of indices that need to be drawn, offset from the begining of the index array, offset from the begining of the vertices array
+	d3d11DevCon->DrawIndexed(6, 0, 0); 
 
 	//Present the back buffer to the screen
 	swapChain->Present(0, 0);
