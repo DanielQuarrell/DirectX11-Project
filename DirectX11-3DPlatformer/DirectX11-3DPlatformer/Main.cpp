@@ -3,6 +3,7 @@
 #include <d3dx11.h>
 #include <d3dx10.h>
 #include <DXErr.h>
+#include <DirectXMath.h>
 
 //Include Direct3D Library files
 
@@ -385,15 +386,13 @@ bool InitScene()
 	// Create constant buffer for transformation matrix
 	struct ConstantBuffer
 	{
-		D3DXMATRIX transformation;
+		DirectX::XMMATRIX transformation;
 	};
 	const ConstantBuffer cb
 	{
 		{
-			0.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 0.0f,
-			0.0f, 0.0f, 1.0f, 0.0f,
-			0.0f, 0.0f, 0.0f, 1.0f
+			DirectX::XMMatrixRotationZ(0) *
+			DirectX::XMMatrixScaling(3.0f / 4.0f, 1.0f, 1.0f)
 		}
 	};
 
