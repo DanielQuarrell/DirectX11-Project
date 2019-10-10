@@ -19,10 +19,11 @@ ID3D11Device*			d3d11Device;
 ID3D11DeviceContext*	d3d11DevCon;
 
 ID3D11RenderTargetView* renderTargetView;
-ID3D11Buffer*			squareIndexBuffer;	//Buffer index to define triangles
-ID3D11Buffer*			squareVertBuffer;	//Buffer that will hold vertex data
+ID3D11Buffer*			pIndexBuffer;	//Buffer index to define triangles
+ID3D11Buffer*			pVertBuffer;	//Buffer that will hold vertex data
 ID3D11DepthStencilView* depthStencilView;
 ID3D11Texture2D*		depthStencilBuffer;
+ID3D11Buffer*			pConstantBuffer;		//Constant buffer interface
 
 ID3D11VertexShader*		vertexShader;
 ID3D11PixelShader*		pixelShader;
@@ -281,8 +282,8 @@ void ReleaseObjects()
 	d3d11Device->Release();
 	d3d11DevCon->Release();
 	renderTargetView->Release();
-	squareVertBuffer->Release();
-	squareIndexBuffer->Release();
+	pVertBuffer->Release();
+	pIndexBuffer->Release();
 	vertexShader->Release();
 	pixelShader->Release();
 	VS_Buffer->Release();
@@ -290,14 +291,15 @@ void ReleaseObjects()
 	vertexLayout->Release();
 	depthStencilView->Release();
 	depthStencilBuffer->Release();
+	pConstantBuffer->Release();
 }
 
 //Initialize the game scene
 bool InitScene()
 {
 	//Compile Shaders from the shader file
-	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "VS", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
-	hResult = D3DX11CompileFromFile(L"Shaders.shader", 0, 0, "PS", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"PixelVertex.shader", 0, 0, "VS", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"PixelVertex.shader", 0, 0, "PS", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
 
 	//Create the Shader Objects
 	hResult = d3d11Device->CreateVertexShader(VS_Buffer->GetBufferPointer(), VS_Buffer->GetBufferSize(), NULL, &vertexShader);
@@ -333,9 +335,9 @@ bool InitScene()
 	D3D11_SUBRESOURCE_DATA iinitData;
 
 	iinitData.pSysMem = indices;
-	d3d11Device->CreateBuffer(&indexBufferDesc, &iinitData, &squareIndexBuffer);	//Create the buffer
+	d3d11Device->CreateBuffer(&indexBufferDesc, &iinitData, &pIndexBuffer);	//Create the buffer
 
-	d3d11DevCon->IASetIndexBuffer(squareIndexBuffer, DXGI_FORMAT_R32_UINT, 0);		//Bind it to the IA stage of the graphics pipeline
+	d3d11DevCon->IASetIndexBuffer(pIndexBuffer, DXGI_FORMAT_R32_UINT, 0);		//Bind it to the IA stage of the graphics pipeline
 
 	D3D11_BUFFER_DESC vertexBufferDesc;
 	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
@@ -350,7 +352,7 @@ bool InitScene()
 
 	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));										//Clear the memory in the vertex buffer
 	vertexBufferData.pSysMem = vertexBufferArray;													//The data to place into the buffer				
-	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &squareVertBuffer);	//Create the buffer
+	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &pVertBuffer);	//Create the buffer
 	
 	//Create the Input Layout
 	hResult = d3d11Device->CreateInputLayout(inputElementDesc, numElements, VS_Buffer->GetBufferPointer(),
@@ -362,7 +364,7 @@ bool InitScene()
 	//Select which vertex buffer to display
 	UINT stride = sizeof(Vertex);
 	UINT offset = 0;
-	d3d11DevCon->IASetVertexBuffers(0, 1, &squareVertBuffer, &stride, &offset);
+	d3d11DevCon->IASetVertexBuffers(0, 1, &pVertBuffer, &stride, &offset);
 
 	//Select which primtive type we are using
 	d3d11DevCon->IASetPrimitiveTopology(D3D10_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
@@ -379,6 +381,34 @@ bool InitScene()
 	viewport.MaxDepth = 1.0f;
 
 	d3d11DevCon->RSSetViewports(1, &viewport);
+
+	// Create constant buffer for transformation matrix
+	struct ConstantBuffer
+	{
+		D3DXMATRIX transformation;
+	};
+	const ConstantBuffer cb
+	{
+		{
+			0.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f
+		}
+	};
+
+	D3D11_BUFFER_DESC constantBufferDesc;
+	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+
+	constantBufferDesc.Usage = D3D11_USAGE_DYNAMIC;				//CPU write, GPU read
+	constantBufferDesc.ByteWidth = sizeof(cb);
+	constantBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;	//Bind to the vertex shader file
+	constantBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;	//CPU write as its going to be updated every frame
+	constantBufferDesc.MiscFlags = 0;
+	D3D11_SUBRESOURCE_DATA csd = {};
+	csd.pSysMem = &cb;
+
+	hResult = d3d11Device->CreateBuffer(&constantBufferDesc, &csd, &pConstantBuffer);
 
 	return true;
 }
@@ -397,6 +427,7 @@ void RenderScene()
 	//Refresh the Depth/StencilView
 	d3d11DevCon->ClearDepthStencilView(depthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
+	d3d11DevCon->VSSetConstantBuffers(0, 1, &pConstantBuffer);
 	//Number of indices that need to be drawn, offset from the begining of the index array, offset from the begining of the vertices array
 	d3d11DevCon->DrawIndexed(6, 0, 0); 
 
