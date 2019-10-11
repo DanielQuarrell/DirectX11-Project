@@ -15,23 +15,26 @@
 
 //Global Variables
 
-IDXGISwapChain*			swapChain;
-ID3D11Device*			d3d11Device;
-ID3D11DeviceContext*	d3d11DevCon;
+IDXGISwapChain* swapChain;
+ID3D11Device* d3d11Device;
+ID3D11DeviceContext* d3d11DevCon;
 
 ID3D11RenderTargetView* renderTargetView;
-ID3D11Buffer*			pIndexBuffer;	//Buffer index to define triangles
-ID3D11Buffer*			pVertBuffer;	//Buffer that will hold vertex data
+ID3D11Buffer* pIndexBuffer;	//Buffer index to define triangles
+ID3D11Buffer* pVertBuffer;	//Buffer that will hold vertex data
 ID3D11DepthStencilView* pDepthStencilView;
-ID3D11DepthStencilState*pDepthStecilState;
-ID3D11Texture2D*		pDepthStencilBuffer;
-ID3D11Buffer*			pConstantBuffer;		//Constant buffer interface
+ID3D11DepthStencilState* pDepthStecilState;
+ID3D11Texture2D* pDepthStencilBuffer;
 
-ID3D11VertexShader*		vertexShader;
-ID3D11PixelShader*		pixelShader;
-ID3D10Blob*				VS_Buffer;			//Information about the vertex shader
-ID3D10Blob*				PS_Buffer;			//Information about the pixel shader
-ID3D11InputLayout*		vertexLayout; 
+//Object specific
+ID3D11Buffer* pConstantBuffer;		//Constant buffer interface
+ID3D11Buffer* pConstantBuffer2;		//Constant buffer interface
+
+ID3D11VertexShader* vertexShader;
+ID3D11PixelShader* pixelShader;
+ID3D10Blob* VS_Buffer;			//Information about the vertex shader
+ID3D10Blob* PS_Buffer;			//Information about the pixel shader
+ID3D11InputLayout* vertexLayout;
 
 LPCTSTR WndClassName = L"firstwindow";	//Window Name
 HWND hwnd = NULL;						//Window Handle
@@ -64,18 +67,16 @@ LRESULT CALLBACK WndProc(HWND hWnd,
 struct Vertex
 {
 	D3DXVECTOR3 position;
-	D3DXCOLOR	color;
 
 	Vertex() {}
-	Vertex(D3DXVECTOR3 _position, D3DXCOLOR _colour) 
-		: position(_position), color(_colour) {}
+	Vertex(D3DXVECTOR3 _position)
+		: position(_position) {}
 };
 
 //The input-layout description
 D3D11_INPUT_ELEMENT_DESC inputElementDesc[] =
 {
 	{"POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
-	{"COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0}
 };
 UINT numElements = ARRAYSIZE(inputElementDesc);
 
@@ -174,7 +175,7 @@ bool InitializeDirect3d11(HINSTANCE hInstance)
 {
 	//Buffer Description - struct
 	DXGI_MODE_DESC bufferDesc;
-	
+
 	ZeroMemory(&bufferDesc, sizeof(DXGI_MODE_DESC)); //Cleared the data structure and set it to null
 
 	bufferDesc.Width = WINDOW_WIDTH;
@@ -210,7 +211,7 @@ bool InitializeDirect3d11(HINSTANCE hInstance)
 		NULL,									//Pointer for pFeatureLevels (video card features), NULL for highest
 		NULL,									//Number of elements in the pFeatureLevels array
 		D3D11_SDK_VERSION,						//SDK version
-		&swapChainDesc,							
+		&swapChainDesc,
 		&swapChain,
 		&d3d11Device,
 		NULL,									//Pointer to D3D_FEATURE_LEVEL (Used for backwards compatibility)
@@ -267,15 +268,15 @@ bool InitializeDirect3d11(HINSTANCE hInstance)
 	D3D11_TEXTURE2D_DESC depthBufferDesc;
 	ZeroMemory(&depthBufferDesc, sizeof(D3D11_TEXTURE2D_DESC));
 
-	depthBufferDesc.Width		= WINDOW_WIDTH;
-	depthBufferDesc.Height		= WINDOW_HEIGHT;
-	depthBufferDesc.MipLevels	= 1;
-	depthBufferDesc.ArraySize	= 1;
+	depthBufferDesc.Width = WINDOW_WIDTH;
+	depthBufferDesc.Height = WINDOW_HEIGHT;
+	depthBufferDesc.MipLevels = 1;
+	depthBufferDesc.ArraySize = 1;
 	depthBufferDesc.Format = DXGI_FORMAT_D32_FLOAT;
 	depthBufferDesc.SampleDesc.Count = 1;					//anti-aliasing 
 	depthBufferDesc.SampleDesc.Quality = 0;					//anti-aliasing 
 	depthBufferDesc.Usage = D3D11_USAGE_DEFAULT;
-	depthBufferDesc.BindFlags	= D3D11_BIND_DEPTH_STENCIL;
+	depthBufferDesc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
 
 	hResult = d3d11Device->CreateTexture2D(&depthBufferDesc, nullptr, &pDepthStencilBuffer);
 
@@ -333,8 +334,8 @@ void ReleaseObjects()
 bool InitScene()
 {
 	//Compile Shaders from the shader file
-	hResult = D3DX11CompileFromFile(L"PixelVertex.shader", 0, 0, "VS", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
-	hResult = D3DX11CompileFromFile(L"PixelVertex.shader", 0, 0, "PS", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"Shaders.fx", 0, 0, "VS", "vs_5_0", 0, 0, 0, &VS_Buffer, 0, 0);
+	hResult = D3DX11CompileFromFile(L"Shaders.fx", 0, 0, "PS", "ps_5_0", 0, 0, 0, &PS_Buffer, 0, 0);
 
 	//Create the Shader Objects
 	hResult = d3d11Device->CreateVertexShader(VS_Buffer->GetBufferPointer(), VS_Buffer->GetBufferSize(), NULL, &vertexShader);
@@ -347,14 +348,14 @@ bool InitScene()
 	//Create the vertex buffer
 	Vertex verticies[] =
 	{
-		Vertex{D3DXVECTOR3(-0.5f, -0.5f, -0.5f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3( 0.5f, -0.5f, -0.5f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3(-0.5f,  0.5f, -0.5f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)},
-		Vertex{D3DXVECTOR3( 0.5f,  0.5f, -0.5f), D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3(-0.5f, -0.5f,  0.5f), D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3( 0.5f, -0.5f,  0.5f), D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
-		Vertex{D3DXVECTOR3(-0.5f,  0.5f,  0.5f), D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)},
-		Vertex{D3DXVECTOR3( 0.5f,  0.5f,  0.5f), D3DXCOLOR(0.0f, 0.0f, 0.0f, 1.0f)}
+		Vertex{D3DXVECTOR3(-0.5f, -0.5f, -0.5f)},
+		Vertex{D3DXVECTOR3(0.5f, -0.5f, -0.5f)},
+		Vertex{D3DXVECTOR3(-0.5f,  0.5f, -0.5f)},
+		Vertex{D3DXVECTOR3(0.5f,  0.5f, -0.5f)},
+		Vertex{D3DXVECTOR3(-0.5f, -0.5f,  0.5f)},
+		Vertex{D3DXVECTOR3(0.5f, -0.5f,  0.5f)},
+		Vertex{D3DXVECTOR3(-0.5f,  0.5f,  0.5f)},
+		Vertex{D3DXVECTOR3(0.5f,  0.5f,  0.5f)}
 	};
 
 	DWORD indices[] = {
@@ -389,14 +390,14 @@ bool InitScene()
 	vertexBufferDesc.ByteWidth = sizeof(verticies);	//Byte Size = Vertex struct * 3 since there is 3 elements in the array
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;						//Use buffer as a vertex buffer
 	vertexBufferDesc.CPUAccessFlags = 0;										//Defines how a CPU can access a resource
-	vertexBufferDesc.MiscFlags = 0;												
+	vertexBufferDesc.MiscFlags = 0;
 
 	D3D11_SUBRESOURCE_DATA vertexBufferData;
 
 	ZeroMemory(&vertexBufferData, sizeof(vertexBufferData));										//Clear the memory in the vertex buffer
 	vertexBufferData.pSysMem = verticies;													//The data to place into the buffer				
 	hResult = d3d11Device->CreateBuffer(&vertexBufferDesc, &vertexBufferData, &pVertBuffer);	//Create the buffer
-	
+
 	//Create the Input Layout
 	hResult = d3d11Device->CreateInputLayout(inputElementDesc, numElements, VS_Buffer->GetBufferPointer(),
 		VS_Buffer->GetBufferSize(), &vertexLayout);
@@ -456,6 +457,36 @@ bool InitScene()
 
 	hResult = d3d11Device->CreateBuffer(&constantBufferDesc, &csd, &pConstantBuffer);
 
+	struct ConstantBuffer2
+	{
+		D3DXCOLOR face_colors[6];
+	};
+	const ConstantBuffer2 cb2 =
+	{
+		{
+			{D3DXCOLOR(1.0f, 0.0f, 1.0f, 1.0f)},
+			{D3DXCOLOR(1.0f, 0.0f, 0.0f, 1.0f)},
+			{D3DXCOLOR(0.0f, 1.0f, 0.0f, 1.0f)},
+			{D3DXCOLOR(0.0f, 0.0f, 1.0f, 1.0f)},
+			{D3DXCOLOR(1.0f, 1.0f, 1.0f, 1.0f)},
+			{D3DXCOLOR(0.0f, 1.0f, 1.0f, 1.0f)},
+		}
+	};
+
+	D3D11_BUFFER_DESC constantBuffer2Desc;
+	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
+	constantBuffer2Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	constantBuffer2Desc.Usage = D3D11_USAGE_DEFAULT;				//GPU read / write
+	constantBuffer2Desc.ByteWidth = sizeof(cb);
+	constantBuffer2Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;		//Bind to the vertex shader file
+	constantBuffer2Desc.CPUAccessFlags = 0;
+	constantBuffer2Desc.MiscFlags = 0;
+	constantBuffer2Desc.StructureByteStride = 0;
+	D3D11_SUBRESOURCE_DATA csd2 = {};
+	csd2.pSysMem = &cb2;
+
+	hResult = d3d11Device->CreateBuffer(&constantBuffer2Desc, &csd2, &pConstantBuffer2);
+
 	return true;
 }
 
@@ -473,7 +504,10 @@ void RenderScene()
 	//Clear the depth buffer
 	d3d11DevCon->ClearDepthStencilView(pDepthStencilView, D3D11_CLEAR_DEPTH | D3D11_CLEAR_STENCIL, 1.0f, 0);
 
+	//Bind buffer to the vertex and pixel shaders
 	d3d11DevCon->VSSetConstantBuffers(0, 1, &pConstantBuffer);
+	d3d11DevCon->PSSetConstantBuffers(0, 1, &pConstantBuffer2);
+
 	//Number of indices that need to be drawn, offset from the begining of the index array, offset from the begining of the vertices array
 	d3d11DevCon->DrawIndexed(36, 0, 0);
 
@@ -484,7 +518,7 @@ void RenderScene()
 int messageloop()
 {
 	MSG msg;
-	
+
 	ZeroMemory(&msg, sizeof(MSG)); //Cleared the data structure and set it to null
 
 	//While a message is displayed
@@ -516,7 +550,7 @@ int messageloop()
 }
 
 //Default windows procedure for processing
-LRESULT CALLBACK WndProc( 
+LRESULT CALLBACK WndProc(
 	HWND hwnd,
 	UINT msg,
 	WPARAM wParam,

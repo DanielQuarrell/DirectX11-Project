@@ -23,7 +23,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="PixelVertex.shader">
+    <None Include="Shaders.fx">
       <Filter>Shader</Filter>
     </None>
   </ItemGroup>
