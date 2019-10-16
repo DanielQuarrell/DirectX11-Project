@@ -328,6 +328,7 @@ void ReleaseObjects()
 	pDepthStencilView->Release();
 	pDepthStencilBuffer->Release();
 	pConstantBuffer->Release();
+	pConstantBuffer2->Release();
 }
 
 //Initialize the game scene
@@ -371,7 +372,7 @@ bool InitScene()
 	ZeroMemory(&indexBufferDesc, sizeof(indexBufferDesc));
 
 	indexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU
-	indexBufferDesc.ByteWidth = sizeof(indices);				//Byte size = DWORD type * 2 triangles * 3 verticies for each triangle
+	indexBufferDesc.ByteWidth = sizeof(indices);								//Byte size = DWORD type * 2 triangles * 3 verticies for each triangle
 	indexBufferDesc.BindFlags = D3D11_BIND_INDEX_BUFFER;						//Use buffer as a index buffer
 	indexBufferDesc.CPUAccessFlags = 0;											//Defines how a CPU can access a resource
 	indexBufferDesc.MiscFlags = 0;
@@ -387,7 +388,7 @@ bool InitScene()
 	ZeroMemory(&vertexBufferDesc, sizeof(vertexBufferDesc));
 
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;								//Reads and writes to the GPU 
-	vertexBufferDesc.ByteWidth = sizeof(verticies);	//Byte Size = Vertex struct * 3 since there is 3 elements in the array
+	vertexBufferDesc.ByteWidth = sizeof(verticies);								//Byte Size = Vertex struct * 3 since there is 3 elements in the array
 	vertexBufferDesc.BindFlags = D3D11_BIND_VERTEX_BUFFER;						//Use buffer as a vertex buffer
 	vertexBufferDesc.CPUAccessFlags = 0;										//Defines how a CPU can access a resource
 	vertexBufferDesc.MiscFlags = 0;
@@ -476,7 +477,7 @@ bool InitScene()
 	D3D11_BUFFER_DESC constantBuffer2Desc;
 	ZeroMemory(&constantBufferDesc, sizeof(D3D11_BUFFER_DESC));
 	constantBuffer2Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	constantBuffer2Desc.Usage = D3D11_USAGE_DEFAULT;				//GPU read / write
+	constantBuffer2Desc.Usage = D3D11_USAGE_DEFAULT;				
 	constantBuffer2Desc.ByteWidth = sizeof(cb);
 	constantBuffer2Desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;		//Bind to the vertex shader file
 	constantBuffer2Desc.CPUAccessFlags = 0;
